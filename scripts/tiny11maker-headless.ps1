@@ -99,13 +99,33 @@ function Set-RegistryValue {
     }
 }
 
-function Remove-RegistryValue {
+function Remove-RegistryKey {
     param([string]$path)
     try {
-        & 'reg' 'delete' $path '/f' | Out-Null
-        Write-Log "Removed registry: $path"
+        & 'reg' 'delete' $path '/f' 2>&1 | Out-Null
+        Write-Log "Removed registry key: $path"
     } catch {
-        Write-Log "Error removing registry $path : $_" "WARN"
+        Write-Log "Registry key not found or error: $path" "WARN"
+    }
+}
+
+function Remove-RegistryValue {
+    # Removes a single value from a registry key. $path is the full
+    # "key\valueName" form (e.g. '...\Run\OneDriveSetup'), where everything
+    # after the last backslash is the value name and the rest is the key.
+    param([string]$path)
+    $lastSlash = $path.LastIndexOf('\')
+    if ($lastSlash -lt 0) {
+        Write-Log "Invalid registry value path (missing key\value separator): $path" "WARN"
+        return
+    }
+    $keyPath = $path.Substring(0, $lastSlash)
+    $valueName = $path.Substring($lastSlash + 1)
+    try {
+        & 'reg' 'delete' $keyPath '/v' $valueName '/f' 2>&1 | Out-Null
+        Write-Log "Removed registry value: $path"
+    } catch {
+        Write-Log "Registry value not found or error: $path" "WARN"
     }
 }
 
@@ -490,8 +510,8 @@ function Apply-RegistryTweaks {
     Set-RegistryValue 'HKLM\zSOFTWARE\Policies\Microsoft\PushToInstall' 'DisablePushToInstall' 'REG_DWORD' '1'
     Set-RegistryValue 'HKLM\zSOFTWARE\Policies\Microsoft\MRT' 'DontOfferThroughWUAU' 'REG_DWORD' '1'
     
-    Remove-RegistryValue 'HKLM\zNTUSER\Software\Microsoft\Windows\CurrentVersion\ContentDeliveryManager\Subscriptions'
-    Remove-RegistryValue 'HKLM\zNTUSER\Software\Microsoft\Windows\CurrentVersion\ContentDeliveryManager\SuggestedApps'
+    Remove-RegistryKey 'HKLM\zNTUSER\Software\Microsoft\Windows\CurrentVersion\ContentDeliveryManager\Subscriptions'
+    Remove-RegistryKey 'HKLM\zNTUSER\Software\Microsoft\Windows\CurrentVersion\ContentDeliveryManager\SuggestedApps'
     
     Set-RegistryValue 'HKLM\zSOFTWARE\Policies\Microsoft\Windows\CloudContent' 'DisableConsumerAccountStateContent' 'REG_DWORD' '1'
     Set-RegistryValue 'HKLM\zSOFTWARE\Policies\Microsoft\Windows\CloudContent' 'DisableCloudOptimizedContent' 'REG_DWORD' '1'
@@ -516,8 +536,8 @@ function Apply-RegistryTweaks {
     Set-RegistryValue 'HKLM\zNTUSER\SOFTWARE\Microsoft\Windows\CurrentVersion\Explorer\Advanced' 'TaskbarMn' 'REG_DWORD' '0'
     
     # Remove Edge registries
-    Remove-RegistryValue "HKLM\zSOFTWARE\WOW6432Node\Microsoft\Windows\CurrentVersion\Uninstall\Microsoft Edge"
-    Remove-RegistryValue "HKLM\zSOFTWARE\WOW6432Node\Microsoft\Windows\CurrentVersion\Uninstall\Microsoft Edge Update"
+    Remove-RegistryKey "HKLM\zSOFTWARE\WOW6432Node\Microsoft\Windows\CurrentVersion\Uninstall\Microsoft Edge"
+    Remove-RegistryKey "HKLM\zSOFTWARE\WOW6432Node\Microsoft\Windows\CurrentVersion\Uninstall\Microsoft Edge Update"
     
     # Disable OneDrive folder backup
     Set-RegistryValue "HKLM\zSOFTWARE\Policies\Microsoft\Windows\OneDrive" "DisableFileSyncNGSC" "REG_DWORD" "1"
@@ -542,8 +562,8 @@ function Apply-RegistryTweaks {
     Set-RegistryValue 'HKLM\zSOFTWARE\Microsoft\Windows\CurrentVersion\WindowsUpdate\Orchestrator\UScheduler_Oobe\OutlookUpdate' 'workCompleted' 'REG_DWORD' '1'
     Set-RegistryValue 'HKLM\zSOFTWARE\Microsoft\Windows\CurrentVersion\WindowsUpdate\Orchestrator\UScheduler\OutlookUpdate' 'workCompleted' 'REG_DWORD' '1'
     Set-RegistryValue 'HKLM\zSOFTWARE\Microsoft\Windows\CurrentVersion\WindowsUpdate\Orchestrator\UScheduler\DevHomeUpdate' 'workCompleted' 'REG_DWORD' '1'
-    Remove-RegistryValue 'HKLM\zSOFTWARE\Microsoft\WindowsUpdate\Orchestrator\UScheduler_Oobe\OutlookUpdate'
-    Remove-RegistryValue 'HKLM\zSOFTWARE\Microsoft\WindowsUpdate\Orchestrator\UScheduler_Oobe\DevHomeUpdate'
+    Remove-RegistryKey 'HKLM\zSOFTWARE\Microsoft\WindowsUpdate\Orchestrator\UScheduler_Oobe\OutlookUpdate'
+    Remove-RegistryKey 'HKLM\zSOFTWARE\Microsoft\WindowsUpdate\Orchestrator\UScheduler_Oobe\DevHomeUpdate'
     
     # Disable Copilot
     Set-RegistryValue 'HKLM\zSOFTWARE\Policies\Microsoft\Windows\WindowsCopilot' 'TurnOffWindowsCopilot' 'REG_DWORD' '1'

@@ -625,6 +625,26 @@ function Set-RegistryValue {
     }
 }
 
+function Remove-RegistryValue {
+    # Removes a single value from a registry key. $path is the full
+    # "key\valueName" form (e.g. '...\Run\OneDriveSetup'), where everything
+    # after the last backslash is the value name and the rest is the key.
+    param([string]$path)
+    $lastSlash = $path.LastIndexOf('\')
+    if ($lastSlash -lt 0) {
+        Write-Log "Invalid registry value path (missing key\value separator): $path" "WARN"
+        return
+    }
+    $keyPath = $path.Substring(0, $lastSlash)
+    $valueName = $path.Substring($lastSlash + 1)
+    try {
+        & 'reg' 'delete' $keyPath '/v' $valueName '/f' 2>&1 | Out-Null
+        Write-Log "Removed registry value: $path"
+    } catch {
+        Write-Log "Registry value not found or error: $path" "WARN"
+    }
+}
+
 function Apply-RegistryTweaks {
     Write-Log "Applying registry tweaks..."
 
