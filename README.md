@@ -174,8 +174,8 @@ Set-ExecutionPolicy Bypass -Scope Process
   <tr>
     <td><strong>Windows Recovery</strong></td>
     <td>✅ Intact</td>
-    <td>❌ Removed</td>
-    <td>❌ Removed</td>
+    <td>⚙️ Optional (removed by default, use <code>-PreserveWinRE</code>)</td>
+    <td>⚙️ Optional (removed by default, use <code>-PreserveWinRE</code>)</td>
   </tr>
   <tr>
     <td><strong>Windows Defender</strong></td>
@@ -262,6 +262,7 @@ tiny11-automated/
 ```powershell
 .\tiny11coremaker-headless.ps1
     [-ENABLE_DOTNET35]         # Enable .NET Framework 3.5 support
+    [-PreserveWinRE]           # Keep winre.wim intact (required for real hardware / 24H2+ to avoid 0x8007000B)
 ```
 
 ### Nano Variant
@@ -272,6 +273,7 @@ tiny11-automated/
     -INDEX <int>               # Image index
     [-SCRATCH <string>]        # Optional: Scratch disk
     [-SkipCleanup]             # Optional: Keep temp files
+    [-PreserveWinRE]           # Keep winre.wim intact (required for real hardware / 24H2+ to avoid 0x8007000B)
 ```
 
 ### Examples
@@ -282,6 +284,12 @@ tiny11-automated/
 
 # Professional Edition Core with .NET 3.5
 .\scripts\tiny11coremaker-headless.ps1 -ISO E -INDEX 6 -ENABLE_DOTNET35
+
+# Core build targeting real hardware (preserves WinRE to avoid 0x8007000B on 24H2/25H2)
+.\scripts\tiny11coremaker-headless.ps1 -ISO E -INDEX 6 -PreserveWinRE
+
+# Nano build with WinRE preserved (real hardware use)
+.\scripts\nano11builder-headless.ps1 -ISO E -INDEX 1 -PreserveWinRE
 
 # Custom scratch drive (useful for limited C:\ space)
 .\scripts\tiny11maker-headless.ps1 -ISO E -INDEX 1 -SCRATCH D
@@ -494,6 +502,9 @@ skip_cleanup:           # Same as Standard
 enable_dotnet35:        # 🆕 Enable .NET Framework 3.5
   type: boolean
   default: false
+preserve_winre:         # 🆕 Preserve winre.wim (real hardware / 24H2+ builds)
+  type: boolean
+  default: false
 ```
 
 #### 3. Build Nano11 (EXTREME Minimal)
@@ -510,6 +521,9 @@ language:               # Language name (English, etc.)
   default: "English"
   
 skip_cleanup:           # Same as above
+preserve_winre:         # 🆕 Preserve winre.wim (real hardware / 24H2+ builds)
+  type: boolean
+  default: false
 ```
 
 ### Workflow Features

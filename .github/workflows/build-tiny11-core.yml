@@ -414,7 +414,11 @@ jobs:
           Write-Output ""
           Write-Output "!!! THIS IS A TINY11 CORE BUILD !!!"
           Write-Output "Features removed:"
-          Write-Output "  - Windows Recovery Environment (WinRE)"
+          if ("${{ github.event.inputs.preserve_winre }}" -eq "true") {
+            Write-Output "  - Windows Recovery Environment (WinRE): PRESERVED"
+          } else {
+            Write-Output "  - Windows Recovery Environment (WinRE)"
+          }
           Write-Output "  - Most WinSxS components (replaced with minimal set)"
           Write-Output "  - Windows Defender services"
           Write-Output "  - Update services (WU disabled)"
@@ -511,7 +515,11 @@ jobs:
           Write-Output "⚠️  IMPORTANT WARNINGS:"
           Write-Output ""
           Write-Output "This is a TINY11 CORE build with aggressive optimization:"
-          Write-Output "  ✗ WinRE removed - No recovery environment"
+          if ("${{ github.event.inputs.preserve_winre }}" -eq "true") {
+            Write-Output "  ✓ WinRE preserved - Recovery environment intact"
+          } else {
+            Write-Output "  ✗ WinRE removed - No recovery environment"
+          }
           Write-Output "  ✗ WinSxS minimized - Cannot add features/updates"
           Write-Output "  ✗ Defender disabled - No built-in antivirus"
           Write-Output "  ✗ Updates disabled - Manual updates only"
@@ -703,7 +711,7 @@ jobs:
             ```
 
             ### ❌ What's Removed
-            - **Windows Recovery Environment (WinRE)**
+            ${{ github.event.inputs.preserve_winre != 'true' && '- **Windows Recovery Environment (WinRE)**' || '' }}
             - **Windows Component Store (WinSxS)**
             - **Windows Defender & Security Services**
             - **Windows Update Service**
@@ -715,7 +723,7 @@ jobs:
             ### ⚠️ Core Limitations
             - ❌ **NOT Serviceable** - Cannot add languages or features
             - ❌ **NO Updates** - Cannot install Cumulative Updates
-            - ❌ **NO Recovery** - No "Reset this PC" or Advanced Startup
+            - ${{ github.event.inputs.preserve_winre == 'true' && '✅ **Recovery intact** - WinRE preserved via -PreserveWinRE flag' || '❌ **NO Recovery** - No "Reset this PC" or Advanced Startup' }}
             - ❌ **NO Defender** - No real-time protection
 
             ### ✅ Features
@@ -774,7 +782,7 @@ jobs:
           ``````
 
           ## ⚠️ Warnings
-          - No WinRE (Recovery)
+          - ${{ github.event.inputs.preserve_winre == 'true' && 'WinRE Preserved' || 'No WinRE (Recovery)' }}
           - No WinSxS (Updates)
           - No Defender
           - Testing/VM Use Only
