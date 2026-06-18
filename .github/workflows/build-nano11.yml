@@ -60,6 +60,12 @@ jobs:
         with:
           fetch-depth: 1
 
+      - name: Record build start time
+        shell: pwsh
+        run: |
+          $startUnix = [DateTimeOffset]::UtcNow.ToUnixTimeSeconds()
+          Add-Content -Path $env:GITHUB_ENV -Value "BUILD_START_UNIX=$startUnix"
+
       - name: Generate release tag and ISO name
         shell: powershell
         run: |
@@ -400,17 +406,17 @@ jobs:
         if: success()
         continue-on-error: true
         run: |
-          # Get ISO size
-          $isoPath = Get-ChildItem -Path . -Filter "*.iso" -Recurse | Select-Object -First 1
-          $isoSize = if ($isoPath) { 
-            "{0:N2} GB" -f ($isoPath.Length / 1GB)
-          } else { 
-            "Unknown" 
+          $isoSize = if ($env:ISO_SIZE_GB) {
+            "$env:ISO_SIZE_GB GB"
+          } else {
+            $isoPath = Get-ChildItem -Path . -Filter "*.iso" -Recurse | Select-Object -First 1
+            if ($isoPath) { "{0:N2} GB" -f ($isoPath.Length / 1GB) } else { "Unknown" }
           }
-          
-          # Calculate duration (rough estimate)
-          $duration = "${{ job.duration }}"
-          
+
+          # Compute real elapsed wall-clock duration from the recorded start time
+          $elapsed = [DateTimeOffset]::UtcNow.ToUnixTimeSeconds() - [long]$env:BUILD_START_UNIX
+          $duration = "{0}m {1}s" -f [math]::Floor($elapsed / 60), ($elapsed % 60)
+
           python scripts/discord_notify.py `
             --webhook "$env:DISCORD_WEBHOOK" `
             --type build-completed `
@@ -418,7 +424,7 @@ jobs:
               version = "${{ inputs.windows_version }}"
               build_type = "Nano"
               edition = "$env:EDITION_NAME"
-              duration = "Completed"
+              duration = $duration
               iso_size = $isoSize
               download_url = "https://sourceforge.net/projects/tiny-11-releases/"
               preserve_winre = "${{ inputs.preserve_winre }}"
@@ -695,10 +701,47 @@ jobs:
           "@
 
           Add-Content -Path $env:GITHUB_STEP_SUMMARY -Value $summary
+      - name: Capture build error for Discord
+        if: failure()
+        continue-on-error: true
+        shell: pwsh
+        run: |
+          $logFile = Get-ChildItem -Path scripts -Filter "nano11_*.log" -ErrorAction SilentlyContinue |
+                     Sort-Object LastWriteTime -Descending |
+                     Select-Object -First 1
+          if ($logFile) {
+            $errorLines = Select-String -Path $logFile.FullName -Pattern '\[ERROR\]' |
+                          Select-Object -Last 10 |
+                          ForEach-Object { $_.Line }
+            $errorSummary = if ($errorLines) {
+              $errorLines -join "`n"
+            } else {
+              (Get-Content $logFile.FullName -Tail 5) -join "`n"
+            }
+            Add-Content -Path $env:GITHUB_ENV -Value "BUILD_ERROR_SUMMARY<<EOF"
+            Add-Content -Path $env:GITHUB_ENV -Value $errorSummary
+            Add-Content -Path $env:GITHUB_ENV -Value "EOF"
+          } else {
+            Add-Content -Path $env:GITHUB_ENV -Value "BUILD_ERROR_SUMMARY=No builder log found — check step outputs above."
+          }
+
+      - name: Upload build log on failure
+        if: failure()
+        continue-on-error: true
+        uses: actions/upload-artifact@v4
+        with:
+          name: nano11-build-log-${{ github.run_id }}
+          path: scripts/nano11_*.log
+          retention-days: 14
+          if-no-files-found: warn
+
       - name: Discord - Build Failed
         if: failure()
         continue-on-error: true
         run: |
+          $elapsed = [DateTimeOffset]::UtcNow.ToUnixTimeSeconds() - [long]$env:BUILD_START_UNIX
+          $duration = "{0}m {1}s" -f [math]::Floor($elapsed / 60), ($elapsed % 60)
+
           python scripts/discord_notify.py `
             --webhook "$env:DISCORD_WEBHOOK" `
             --type build-failed `
@@ -706,10 +749,10 @@ jobs:
               version = "${{ inputs.windows_version }}"
               build_type = "Nano"
               edition = "$env:EDITION_NAME"
-              error = "Build failed - check logs for details"
+              duration = $duration
+              error = $env:BUILD_ERROR_SUMMARY
               logs_url = "${{ github.server_url }}/${{ github.repository }}/actions/runs/${{ github.run_id }}"
             } -Compress)
         env:
           DISCORD_WEBHOOK: ${{ secrets.DISCORD_WEBHOOK_ERRORS }}
         shell: pwsh
-
