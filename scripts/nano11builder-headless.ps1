@@ -700,6 +700,71 @@ function Remove-WinRE {
     Write-Log "WinRE removed"
 }
 
+function Patch-ReAgentXml {
+    # Author: kelexine (https://github.com/kelexine)
+    #
+    # WHY THIS IS NEEDED
+    # ------------------
+    # ReAgent.xml (Windows\System32\Recovery\ReAgent.xml) is the offline config
+    # file that reagentc and Windows Setup read to determine WinRE state.
+    #
+    # After Remove-WinRE deletes winre.wim the XML may still contain:
+    #   <WinREStaged state="1"/>         -- tells Setup a staged WIM exists
+    #   <ImageLocation path="..."/>      -- stale path pointing to deleted file
+    #   <InstallState state="1"/>        -- marks WinRE as installed
+    #
+    # On EFI/UEFI systems Windows Setup reads this file during the Pre-Finalize
+    # phase (~75%) via WinReInstallOnTargetOS. If it sees WinREStaged=1 but
+    # can't find or mount the WIM it referenced, setup.exe aborts. If the file
+    # is absent OR consistently says state=0 everywhere, Setup skips gracefully.
+    #
+    # STRATEGY: rewrite the file with all state attributes zeroed and paths
+    # cleared. We preserve the XML schema/version so reagentc doesn't choke on
+    # a malformed file on first boot.
+    Write-Log "Patching ReAgent.xml to clear stale WinRE staging state..."
+
+    $reagentXmlPath = "$scratchDir\Windows\System32\Recovery\ReAgent.xml"
+
+    # Canonical zeroed-out ReAgent.xml — schema version matches Win11 23H2/24H2/25H2.
+    # All state attributes are 0, all path/guid/id/offset attributes are empty/zero.
+    # This is equivalent to what reagentc /disable writes on a live system.
+    $cleanXml = @'
+<?xml version='1.0' encoding='utf-8'?>
+<WindowsRE version="2.0">
+  <WinreBCD id="{00000000-0000-0000-0000-000000000000}"/>
+  <WinreLocation path="" id="0" offset="0" guid="{00000000-0000-0000-0000-000000000000}"/>
+  <ImageLocation path="" id="0" offset="0" guid="{00000000-0000-0000-0000-000000000000}"/>
+  <PBRImageLocation path="" id="0" offset="0" guid="{00000000-0000-0000-0000-000000000000}" index="0"/>
+  <PBRCustomImageLocation path="" id="0" offset="0" guid="{00000000-0000-0000-0000-000000000000}" index="0"/>
+  <InstallState state="0"/>
+  <OsInstallAvailable state="0"/>
+  <CustomImageAvailable state="0"/>
+  <IsAutoRepairOn state="0"/>
+  <WinREStaged state="0"/>
+  <OperationParam path=""/>
+  <OemTool path=""/>
+</WindowsRE>
+'@
+
+    try {
+        # Ensure the Recovery directory exists (it should, but be defensive)
+        $recoveryDir = "$scratchDir\Windows\System32\Recovery"
+        if (-not (Test-Path $recoveryDir)) {
+            New-Item -ItemType Directory -Force -Path $recoveryDir | Out-Null
+            Write-Log "Created missing Recovery directory."
+        }
+
+        # Write as UTF-8 without BOM — reagentc expects plain UTF-8
+        $utf8NoBom = New-Object System.Text.UTF8Encoding $false
+        [System.IO.File]::WriteAllText($reagentXmlPath, $cleanXml.TrimStart(), $utf8NoBom)
+
+        Write-Log "ReAgent.xml patched: all WinRE state/staging fields zeroed."
+    } catch {
+        Write-Log "Failed to patch ReAgent.xml: $_" "WARN"
+        Write-Log "Setup may still skip WinRE gracefully due to missing winre.wim, but patching is preferred." "WARN"
+    }
+}
+
 function Optimize-WinSxS {
     Write-Log "Optimizing WinSxS folder..."
 
@@ -1333,8 +1398,10 @@ try {
     Remove-EdgeAndOneDrive
     if ($PreserveWinRE) {
         Write-Log "Skipping WinRE removal (PreserveWinRE flag set)" "INFO"
+        Write-Log "ReAgent.xml will NOT be patched — original WinRE state preserved." "INFO"
     } else {
         Remove-WinRE
+        Patch-ReAgentXml
     }
 
     # Registry phase
