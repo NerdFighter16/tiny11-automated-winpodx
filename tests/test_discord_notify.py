@@ -216,6 +216,27 @@ class TestBuildExtraFields:
     def test_unknown_keys_silently_ignored(self):
         assert _build_extra_fields({'some_future_key': 'value'}) is None
 
+    def test_windows_build_present(self):
+        fields = _build_extra_fields({'windows_build': '26200.8655'})
+        assert fields is not None
+        build = next(f for f in fields if f['name'] == 'Build')
+        assert build['value'] == '26200.8655'
+
+    def test_windows_build_empty_string_ignored(self):
+        assert _build_extra_fields({'windows_build': ''}) is None
+
+    def test_windows_build_none_ignored(self):
+        assert _build_extra_fields({'windows_build': None}) is None
+
+    def test_windows_build_alongside_other_fields(self):
+        fields = _build_extra_fields({
+            'windows_build': '26200.8655',
+            'preserve_winre': 'true',
+            'enable_dotnet35': 'false'
+        })
+        names = [f['name'] for f in fields]
+        assert names == ['Build', 'WinRE', '.NET 3.5']
+
 
 # ---------------------------------------------------------------------------
 # send_embed — HTTP interactions

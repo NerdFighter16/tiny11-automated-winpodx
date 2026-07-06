@@ -503,6 +503,7 @@ jobs:
               download_url = "https://sourceforge.net/projects/tiny-11-releases/"
               preserve_winre = "${{ inputs.preserve_winre }}"
               enable_dotnet35 = "${{ inputs.enable_dotnet35 }}"
+              windows_build = "$env:WINDOWS_BUILD_NUMBER"
             } -Compress)
         env:
           DISCORD_WEBHOOK: ${{ secrets.DISCORD_WEBHOOK_BUILDS }}
@@ -893,6 +894,7 @@ jobs:
               duration = $duration
               error = $env:BUILD_ERROR_SUMMARY
               logs_url = "${{ github.server_url }}/${{ github.repository }}/actions/runs/${{ github.run_id }}"
+              windows_build = "$env:WINDOWS_BUILD_NUMBER"
             } -Compress)
         env:
           DISCORD_WEBHOOK: ${{ secrets.DISCORD_WEBHOOK_ERRORS }}

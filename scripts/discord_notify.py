@@ -361,6 +361,7 @@ def _build_extra_fields(data: Dict) -> Optional[List[Dict]]:
     """Build optional Discord embed fields from well-known optional keys in the data payload.
 
     Currently surfaces:
+      - windows_build   → 'Build' field (real detected Windows build number)
       - preserve_winre  → 'WinRE' field (Core / Nano builds)
       - enable_dotnet35 → '.NET 3.5' field (Core builds)
 
@@ -368,6 +369,13 @@ def _build_extra_fields(data: Dict) -> Optional[List[Dict]]:
     without touching this function.
     """
     fields: List[Dict] = []
+
+    if 'windows_build' in data and data['windows_build']:
+        fields.append({
+            'name': 'Build',
+            'value': str(data['windows_build']),
+            'inline': True
+        })
 
     if 'preserve_winre' in data and data['preserve_winre'] is not None:
         val = str(data['preserve_winre']).lower()
@@ -424,7 +432,7 @@ def main():
 
     # Coerce known embed fields to strings so Discord doesn't 400 on numeric values
     if isinstance(data, dict):
-        for k in ('version', 'build_type', 'edition', 'duration', 'iso_size', 'error', 'logs_url'):
+        for k in ('version', 'build_type', 'edition', 'duration', 'iso_size', 'error', 'logs_url', 'windows_build'):
             if k in data and data[k] is not None:
                 data[k] = str(data[k])
 
