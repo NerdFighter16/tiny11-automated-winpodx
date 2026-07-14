@@ -772,7 +772,7 @@ jobs:
           name: nano11-build-log-${{ github.run_id }}
           path: scripts/nano11_*.log
           retention-days: 14
-          if-no-files-found: warn
+          if-no-files-found: ignore
 
       - name: Discord - Build Failed
         if: failure()
